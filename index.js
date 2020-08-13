@@ -7,16 +7,21 @@ const minRe = -2, maxRe = 0.5; // Set projection bounds in the real axis
 const updateCanvasDistance = 2;
 const updateCanvasZoom = 10;
 
-const tileScale = 1 + 2 * updateCanvasDistance;
+const tileEdge = 320;
 
-let posRe = (minRe + maxRe) / 2, posIm = 0, zoom = 300;
-let pixelArray;
+let posRe = (minRe + maxRe) / 2, posIm = 0;
+let pixelArray = new Uint8ClampedArray(tileEdge * tileEdge * 4);
 
-const pixelToCoordinate = (width, height, posX, posY) => {
+const pixelToCoordinate = (width, height, zoom, posX, posY) => {
     // Convert pixel coordinates to coordinates on the complex plane,
     // such that the point P(posX, posY) is in the center of the canvas.
-    return [ (posX - width * tileScale / 2)  / zoom + posRe,
-             (posY - height * tileScale / 2) / zoom - posIm ];
+    return [ posRe + (posX - width  / 2) * zoom / tileEdge,
+             posIm - (posY - height / 2) * zoom / tileEdge ];
+}
+
+const coordinateToPixel = (width, height, zoom, pRe, pIm) => {
+    return [ (pRe - posRe) * tileEdge / zoom + width  / 2,
+            -(pIm - posIm) * tileEdge / zoom + height / 2 ];
 }
 
 const getColor = (re, im) => {
@@ -37,101 +42,56 @@ const getColor = (re, im) => {
                 : [(i + 10) % 256, (i + 25) % 256, (i + 50) % 256];
 }
 
-const updateCanvas = () => {
-    const height = docElement.clientHeight, width = docElement.clientWidth;
-    canvas.height = height, canvas.width = width;
+const updateCanvas = (width, height, zoom, tiles) => {
+    let drawContext = canvas.getContext("2d");
 
-    // Update event handlers with the current zoom level and canvas size,
-    // so that dragging and zoomint actions behave correctly.
-    updateEventHandlers(posRe, posIm, zoom);
+    canvas.width = width, canvas.height = height;
 
-    const drawContext = canvas.getContext("2d");
-    const pixelArraySize = height * tileScale * width * tileScale * 4;
-
-    if (!pixelArray || pixelArray.length !== pixelArraySize) {
-        pixelArray = new Uint8ClampedArray(pixelArraySize)
+    if (!tiles[zoom]) {
+        tiles[zoom] = [];
     }
 
-    for (let posY = 0; posY < height * tileScale; ++posY) {
-        for (let posX = 0; posX < width * tileScale; ++posX) {
-            let indexBase = (posY * width * tileScale + posX) * 4;
-            let [re, im] = pixelToCoordinate(width, height, posX, posY);
-            let [red, green, blue] = getColor(re, im);
+    let [lowRe, highIm] = pixelToCoordinate(width, height, zoom, 0, 0);
+    let [highRe, lowIm] = pixelToCoordinate(width, height, zoom, width, height);
+    lowRe = Math.floor(lowRe * zoom) / zoom, highIm = Math.ceil(highIm * zoom) / zoom;
 
-            pixelArray[indexBase + 0] = red;
-            pixelArray[indexBase + 1] = green;
-            pixelArray[indexBase + 2] = blue;
-            pixelArray[indexBase + 3] = 255;
-        }
-
-    }
-
-    let imageData = new ImageData(pixelArray, width * tileScale, height * tileScale);
-
-    let offsetX = updateCanvasDistance * width, offsetY = updateCanvasDistance * height;
-    // dirtyX and dirtyY parameters shift the destination image as well as the source,
-    // so -offsetX/Y has to be supplied to dx and dy args to draw the destination at (0, 0)
-    drawContext.putImageData(imageData, -offsetX, -offsetY, offsetX, offsetY, width, height);
-}
-
-const transformCanvas = (diffX, diffY, zoomFactor) => {
-    const height = canvas.height, width = canvas.width;
-
-    // FIXME: offsetX/Y is not calculated correctly while zooming!
-    const offsetX = updateCanvasDistance * width  * zoomFactor + diffX;
-    const offsetY = updateCanvasDistance * height * zoomFactor - diffY;
-
-    const drawContext = canvas.getContext("2d");
-    // The default transformation has to be set, because calling scale()
-    // would otherwise multiply the previous scale by zoomFactor, not set it
     drawContext.setTransform(1, 0, 0, 1, 0, 0);
-    drawContext.scale(zoomFactor, zoomFactor);
+    drawContext.scale(zoom, zoom);
 
-    let imageData = new ImageData(pixelArray, width * tileScale, height * tileScale);
-    createImageBitmap(
-        imageData, offsetX, offsetY,
-        width / zoomFactor, height / zoomFactor
-    ).then((bitmap) => {
-        drawContext.drawImage(bitmap, 0, 0, width / zoomFactor, height / zoomFactor);
-    });
-}
-
-const updateEventHandlers = (lastRe, lastIm, lastZoom) => {
-    canvas.onmousedown = (event) => {
-        const width = canvas.width, height = canvas.height;
-        const preRe = posRe, preIm = posIm;
-        const preX = event.clientX, preY = event.clientY;
-
-        canvas.onmousemove = (event) => {
-            const postX = event.clientX, postY = event.clientY;
-            posRe = preRe - (postX - preX) / zoom, posIm = preIm + (postY - preY) / zoom;
-
-            const diffX = (posRe - lastRe) * zoom, diffY = (posIm - lastIm) * zoom;
-            if (Math.abs(diffX) > updateCanvasDistance * width ||
-                Math.abs(diffY) > updateCanvasDistance * height) {
-                updateCanvas();
-            } else {
-                transformCanvas(diffX, diffY, zoom / lastZoom);
-            }
+    for (let posIm = highIm; posIm > lowIm; posIm -= (1 / zoom)) {
+        if (!tiles[zoom][posIm]) {
+            tiles[zoom][posIm] = [];
         }
 
-        canvas.onmouseup = () => {
-            canvas.onmousemove = null;
-        }
-    }
+        for (let posRe = lowRe; posRe < highRe; posRe += (1 / zoom)) {
+            let [startX, startY] = coordinateToPixel(width, height, zoom, posRe, posIm).map(Math.round);
 
-    canvas.onwheel = (event) => {
-        if (event.deltaY) {
-            zoom = zoom * (100 - event.deltaY) / 100;
-            if (zoom / lastZoom > updateCanvasZoom) {
-                updateCanvas();
+            if (!tiles[zoom][posIm][posRe]) {
+                for (let posY = 0; posY < tileEdge; ++posY) {
+                    for (let posX = 0; posX < tileEdge; ++posX) {
+                        let indexBase = (posY * tileEdge + posX) * 4;
+                        let [re, im] = pixelToCoordinate(width, height, zoom, startX + posX, startY + posY);
+                        let [red, green, blue] = getColor(re, im);
+
+                        pixelArray[indexBase + 0] = red;
+                        pixelArray[indexBase + 1] = green;
+                        pixelArray[indexBase + 2] = blue;
+                        pixelArray[indexBase + 3] = 255;
+                    }
+                }
+
+                let imageData = new ImageData(pixelArray, tileEdge, tileEdge);
+                createImageBitmap(imageData, 0, 0, tileEdge, tileEdge)
+                    .then((bitmap) => {
+                        tiles[zoom][posIm][posRe] = bitmap;
+                        drawContext.drawImage(bitmap, startX, startY, tileEdge, tileEdge);
+                    });
             } else {
-                const diffX = (posRe - lastRe) * zoom, diffY = (posIm - lastIm) * zoom;
-                transformCanvas(diffX, diffY, zoom / lastZoom);
+                drawContext.drawImage(tiles[zoom][posIm][posRe], startX, startY, tileEdge, tileEdge);
             }
         }
     }
 }
 
-window.onresize = updateCanvas;
-updateCanvas();
+//window.onresize = (window, event) => { console.log(event.width, event.height); };
+updateCanvas(docElement.clientWidth, docElement.clientHeight, 1, []);
