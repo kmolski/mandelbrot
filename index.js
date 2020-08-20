@@ -7,8 +7,6 @@ const tileEdge = 320;
 const minRe = -2, maxRe = 0.5; // Set projection bounds in the real axis
 const initRe = (minRe + maxRe) / 2, initIm = 0;
 
-let pixelArray = new Uint8ClampedArray(tileEdge * tileEdge * 4);
-
 const pixelToCoordinate = (width, height, zoom, posX, posY, posRe, posIm) => {
     // Convert pixel coordinates to coordinates on the complex plane,
     // such that the point P(posRe, posIm) is in the center of the canvas.
@@ -41,6 +39,34 @@ const getColor = (re, im) => {
                 : [(i + 10) % 256, (i + 25) % 256, (i + 50) % 256];
 }
 
+const makeTile = async (width, height, nZoom, currRe, currIm, posRe, posIm) => {
+    let pixelArray = new Uint8ClampedArray(tileEdge * tileEdge * 4);
+
+    let [baseX, baseY] = coordinateToPixel(
+        width, height, nZoom, currRe, currIm, posRe, posIm
+    ).map(Math.round);
+
+    for (let posY = 0; posY < tileEdge; ++posY) {
+        for (let posX = 0; posX < tileEdge; ++posX) {
+            let indexBase = (posY * tileEdge + posX) * 4;
+            let [re, im] = pixelToCoordinate(
+                width, height, nZoom, baseX + posX, baseY + posY, posRe, posIm
+            );
+            let [red, green, blue] = getColor(re, im);
+
+            pixelArray[indexBase + 0] = red;
+            pixelArray[indexBase + 1] = green;
+            pixelArray[indexBase + 2] = blue;
+            pixelArray[indexBase + 3] = 255;
+        }
+    }
+
+    let imageData = new ImageData(pixelArray, tileEdge, tileEdge);
+    return await createImageBitmap(
+        imageData, 0, 0, tileEdge, tileEdge
+    );
+};
+
 const updateCanvas = async (width, height, zoom, posRe, posIm, tiles) => {
     canvas.width = width, canvas.height = height;
 
@@ -49,6 +75,7 @@ const updateCanvas = async (width, height, zoom, posRe, posIm, tiles) => {
     let sIndex = Math.round(Math.log2(zoom));
     let nZoom = Math.pow(2, sIndex);
     let sFactor = zoom / nZoom;
+    let sEdge = Math.ceil(tileEdge * sFactor);
 
     let [lowRe, highIm] = pixelToCoordinate(width, height, zoom, 0, 0, posRe, posIm);
     let [highRe, lowIm] = pixelToCoordinate(width, height, zoom, width, height, posRe, posIm);
@@ -59,7 +86,6 @@ const updateCanvas = async (width, height, zoom, posRe, posIm, tiles) => {
         removeEventHandlers();
         tiles[sIndex] = [];
     }
-    let newTiles = 0;
 
     for (let currIm = highIm; currIm > lowIm; currIm -= (1 / nZoom)) {
         if (!tiles[sIndex][currIm]) { tiles[sIndex][currIm] = []; }
@@ -70,34 +96,12 @@ const updateCanvas = async (width, height, zoom, posRe, posIm, tiles) => {
             ).map(Math.round);
 
             if (!tiles[sIndex][currIm][currRe]) {
-                let [baseX, baseY] = coordinateToPixel(
+                tiles[sIndex][currIm][currRe] = await makeTile(
                     width, height, nZoom, currRe, currIm, posRe, posIm
-                ).map(Math.round);
-
-                console.log("Making tile no.", ++newTiles);
-
-                for (let posY = 0; posY < tileEdge; ++posY) {
-                    for (let posX = 0; posX < tileEdge; ++posX) {
-                        let indexBase = (posY * tileEdge + posX) * 4;
-                        let [re, im] = pixelToCoordinate(
-                            width, height, nZoom, baseX + posX, baseY + posY, posRe, posIm
-                        );
-                        let [red, green, blue] = getColor(re, im);
-
-                        pixelArray[indexBase + 0] = red;
-                        pixelArray[indexBase + 1] = green;
-                        pixelArray[indexBase + 2] = blue;
-                        pixelArray[indexBase + 3] = 255;
-                    }
-                }
-
-                let imageData = new ImageData(pixelArray, tileEdge, tileEdge);
-                tiles [sIndex][currIm][currRe] = await createImageBitmap(
-                    imageData, 0, 0, tileEdge, tileEdge
                 );
             }
             drawContext.drawImage(
-                tiles[sIndex][currIm][currRe], startX, startY, tileEdge * sFactor, tileEdge * sFactor
+                tiles[sIndex][currIm][currRe], startX, startY, sEdge, sEdge
             );
         }
     }
@@ -128,7 +132,7 @@ const updateEventHandlers = (width, height, zoom, posRe, posIm, tiles) => {
 
     canvas.onwheel = async (event) => {
         if (event.deltaY) {
-            let newZoom = (100 * zoom - event.deltaY) / 100;
+            let newZoom = zoom * (1 - event.deltaY / 100);
             await updateCanvas(width, height, newZoom, posRe, posIm, tiles);
         }
     }
@@ -139,12 +143,12 @@ const updateEventHandlers = (width, height, zoom, posRe, posIm, tiles) => {
 }
 
 const removeEventHandlers = () => {
-    window.onresize = () => {};
-    canvas.onmousedown = () => {};
-    canvas.onmousemove = () => {};
-    canvas.onwheel = () => {};
+    canvas.onwheel = null;
+    canvas.onmousedown = null;
+    canvas.onmousemove = null;
+    window.onresize = null;
 }
 
 let initWidth = docElement.clientWidth, initHeight = docElement.clientHeight;
-updateEventHandlers(initWidth, initHeight, 1 , initRe, initIm, []);
+
 updateCanvas(initWidth, initHeight, 1, initRe, initIm, []);
