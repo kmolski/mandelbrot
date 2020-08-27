@@ -2,6 +2,7 @@ const canvas = document.getElementById("canvas");
 const docElement = document.documentElement;
 
 const maxIterations = 1000;
+const zoomSpeed = 100;
 const tileEdge = 320;
 
 const minRe = -2, maxRe = 0.5; // Set projection bounds in the real axis
@@ -72,10 +73,8 @@ const updateCanvas = async (width, height, zoom, posRe, posIm, tiles) => {
 
     let drawContext = canvas.getContext("2d");
 
-    let sIndex = Math.round(Math.log2(zoom));
-    let nZoom = Math.pow(2, sIndex);
-    let sFactor = zoom / nZoom;
-    let sEdge = Math.ceil(tileEdge * sFactor);
+    let sIndex = Math.round(Math.log2(zoom)), nZoom = Math.pow(2, sIndex);
+    let sFactor = zoom / nZoom, sEdge = Math.ceil(tileEdge * sFactor);
 
     let [lowRe, highIm] = pixelToCoordinate(width, height, zoom, 0, 0, posRe, posIm);
     let [highRe, lowIm] = pixelToCoordinate(width, height, zoom, width, height, posRe, posIm);
@@ -132,8 +131,15 @@ const updateEventHandlers = (width, height, zoom, posRe, posIm, tiles) => {
 
     canvas.onwheel = async (event) => {
         if (event.deltaY) {
-            let newZoom = zoom * (1 - event.deltaY / 100);
-            await updateCanvas(width, height, newZoom, posRe, posIm, tiles);
+            let newZoom = zoom * (1 - event.deltaY / zoomSpeed);
+
+            let offsetDivisor = (1 - zoomSpeed / event.deltaY) * zoom * tileEdge;
+            let [offsetRe, offsetIm] = [(event.clientX - width / 2)  / offsetDivisor,
+                                        (height / 2 - event.clientY) / offsetDivisor];
+
+            await updateCanvas(
+                width, height, newZoom, posRe + offsetRe, posIm + offsetIm, tiles
+            );
         }
     }
 
@@ -150,5 +156,4 @@ const removeEventHandlers = () => {
 }
 
 let initWidth = docElement.clientWidth, initHeight = docElement.clientHeight;
-
 updateCanvas(initWidth, initHeight, 1, initRe, initIm, []);
