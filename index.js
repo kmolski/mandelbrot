@@ -1,6 +1,8 @@
 const canvas = document.getElementById("canvas");
 const docElement = document.documentElement;
 
+const bytesPerPixel = 4;
+
 const maxIterations = 1000;
 const zoomSpeed = 100;
 const tileEdge = 320;
@@ -41,7 +43,7 @@ const getColor = (re, im) => {
 }
 
 const makeTile = async (width, height, nZoom, currRe, currIm, posRe, posIm) => {
-    let pixelArray = new Uint8ClampedArray(tileEdge * tileEdge * 4);
+    let pixelArray = new Uint8ClampedArray(tileEdge * tileEdge * bytesPerPixel);
 
     let [baseX, baseY] = coordinateToPixel(
         width, height, nZoom, currRe, currIm, posRe, posIm
@@ -49,7 +51,7 @@ const makeTile = async (width, height, nZoom, currRe, currIm, posRe, posIm) => {
 
     for (let posY = 0; posY < tileEdge; ++posY) {
         for (let posX = 0; posX < tileEdge; ++posX) {
-            let indexBase = (posY * tileEdge + posX) * 4;
+            let indexBase = (posY * tileEdge + posX) * bytesPerPixel;
             let [re, im] = pixelToCoordinate(
                 width, height, nZoom, baseX + posX, baseY + posY, posRe, posIm
             );
@@ -99,6 +101,7 @@ const updateCanvas = async (width, height, zoom, posRe, posIm, tiles) => {
                     width, height, nZoom, currRe, currIm, posRe, posIm
                 );
             }
+
             drawContext.drawImage(
                 tiles[sIndex][currIm][currRe], startX, startY, sEdge, sEdge
             );
@@ -133,13 +136,13 @@ const updateEventHandlers = (width, height, zoom, posRe, posIm, tiles) => {
         if (event.deltaY) {
             let newZoom = zoom * (1 - event.deltaY / zoomSpeed);
 
+            // Shift the coordinates so that the cursor is on the same point
+            // on the complex plane before and after zooming.
             let offsetDivisor = (1 - zoomSpeed / event.deltaY) * zoom * tileEdge;
-            let [offsetRe, offsetIm] = [(event.clientX - width / 2)  / offsetDivisor,
-                                        (height / 2 - event.clientY) / offsetDivisor];
+            let [newRe, newIm] = [posRe + (event.clientX - width / 2)  / offsetDivisor,
+                                  posIm + (height / 2 - event.clientY) / offsetDivisor];
 
-            await updateCanvas(
-                width, height, newZoom, posRe + offsetRe, posIm + offsetIm, tiles
-            );
+            await updateCanvas(width, height, newZoom, newRe, newIm, tiles);
         }
     }
 
