@@ -1,6 +1,9 @@
 const canvas = document.getElementById("canvas");
 const docElement = document.documentElement;
 
+const autoTable = (depth) => new Proxy([], {
+    get: (arr, i) => i in arr ? arr[i] : (depth ? arr[i] = autoTable(depth - 1) : undefined)
+});
 const bytesPerPixel = 4;
 
 const maxIterations = 1000;
@@ -75,18 +78,14 @@ const updateCanvas = (() => {
         if (locked) return;
         locked = true;
 
-        const sIndex = Math.max(Math.round(Math.log2(zoom)), 0), nZoom = Math.pow(2, sIndex);
+        const sIndex = Math.round(Math.log2(zoom)), nZoom = Math.pow(2, sIndex);
         const sFactor = zoom / nZoom, sEdge = Math.ceil(tileEdge * sFactor);
 
         let [lowRe, highIm] = pixelToCoordinate(width, height, zoom, 0, 0, posRe, posIm);
         let [highRe, lowIm] = pixelToCoordinate(width, height, zoom, width, height, posRe, posIm);
         lowRe = Math.floor(lowRe * nZoom) / nZoom, highIm = Math.ceil(highIm * nZoom) / nZoom;
 
-        if (!tiles[sIndex]) { tiles[sIndex] = []; }
-
         for (let im = highIm; im > lowIm; im -= (1 / nZoom)) {
-            if (!tiles[sIndex][im]) { tiles[sIndex][im] = []; }
-
             for (let re = lowRe; re < highRe; re += (1 / nZoom)) {
                 if (!tiles[sIndex][im][re]) {
                     tiles[sIndex][im][re] = await makeTile(
@@ -140,16 +139,15 @@ const updateEventHandlers = (width, height, zoom, posRe, posIm, tiles) => {
     canvas.onwheel = async (event) => {
         if (event.deltaY) {
             const newZoom = zoom * (1 - event.deltaY / zoomSpeed);
-
-            // Shift the coordinates so that the cursor is on the same point
-            // on the complex plane before and after zooming.
+            if (newZoom < 1) return;
+            // Shift the position so that the cursor points at the same
+            // coordinates on the complex plane before and after zooming.
             const offsetDivisor = (1 - zoomSpeed / event.deltaY) * zoom * tileEdge;
-            const [newRe, newIm] = [posRe + (event.clientX - width / 2)  / offsetDivisor,
-                                  posIm + (height / 2 - event.clientY) / offsetDivisor];
+            const [newRe, newIm] = [ posRe + (event.clientX - width / 2)  / offsetDivisor,
+                                     posIm + (height / 2 - event.clientY) / offsetDivisor ];
 
             await updateCanvas(width, height, newZoom, newRe, newIm, tiles);
-
-            // Update canvas.onmousemove() so that moving after zoom works correctly
+            // Update canvas.onmousemove() so that dragging after zooming works correctly.
             if (canvas.onmousemove) { canvas.onmousedown(event); }
         }
     }
@@ -160,4 +158,4 @@ const updateEventHandlers = (width, height, zoom, posRe, posIm, tiles) => {
 }
 
 const initWidth = docElement.clientWidth, initHeight = docElement.clientHeight;
-updateCanvas(initWidth, initHeight, 1, initRe, initIm, []);
+updateCanvas(initWidth, initHeight, 1, initRe, initIm, autoTable(2));
