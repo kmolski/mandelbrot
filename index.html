@@ -12,10 +12,51 @@
         margin: 0;
         overflow: hidden;
     }
+
+    #openSettings,
+    .zoomButton {
+        color: lightgray;
+        background-color: #404040;
+        font-size: 24px;
+        border-color: lightgray;
+        border-style: solid;
+    }
+
+    #openSettings {
+        position: fixed;
+        right: 0px;
+        top: 0px;
+        padding: 2px 8px 4px;
+        border-width: 0px 0px 1px 1px;
+        border-bottom-left-radius: 4px;
+        box-shadow: 0px 0px 4px black;
+    }
+
+    .zoomButton {
+        margin-bottom: 8px;
+        border-width: 1px;
+        border-radius: 4px;
+        box-shadow: 1px 1px 4px black;
+    }
+
+    .zoomButtonContainer {
+        display: grid;
+        position: fixed;
+        right: 12px;
+        bottom: 2px;
+    }
 </style>
 
 <body>
     <canvas id="canvas"></canvas>
+
+    <button id="openSettings">⚙</button>
+
+    <div class="zoomButtonContainer">
+        <button class="zoomButton" id="zoomIn">+</button>
+        <button class="zoomButton" id="zoomOut">-</button>
+    </div>
+
     <script src="index.js"></script>
 </body>
 

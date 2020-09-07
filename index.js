@@ -1,6 +1,9 @@
 const canvas = document.getElementById("canvas");
 const docElement = document.documentElement;
 
+const zoomInBtn = document.getElementById("zoomIn");
+const zoomOutBtn = document.getElementById("zoomOut");
+
 const autoTable = (depth) => new Proxy([], {
     get: (arr, i) => i in arr ? arr[i] : (depth ? arr[i] = autoTable(depth - 1) : undefined)
 });
@@ -151,6 +154,13 @@ const updateEventHandlers = (width, height, zoom, posRe, posIm, tiles) => {
             if (canvas.onmousemove) { canvas.onmousedown(event); }
         }
     }
+
+    const changeZoom = async (zoomDiff) => {
+        await updateCanvas(width, height, zoom * (1 + zoomDiff), posRe, posIm, tiles);
+    }
+
+    zoomInBtn.onclick = async () => changeZoom(0.5);
+    zoomOutBtn.onclick = async () => changeZoom(-0.5);
 
     setZoom = (newZoom) => {
         updateCanvas(width, height, newZoom, posRe, posIm, tiles);
