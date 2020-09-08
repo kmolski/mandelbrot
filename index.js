@@ -156,10 +156,12 @@ const updateEventHandlers = (width, height, zoom, posRe, posIm, tiles) => {
     }
 
     const changeZoom = async (zoomDiff) => {
-        await updateCanvas(width, height, zoom * (1 + zoomDiff), posRe, posIm, tiles);
+        const newZoom = zoom * (1 + zoomDiff);
+        if (newZoom < 1) return;
+        await updateCanvas(width, height, newZoom, posRe, posIm, tiles);
     }
 
-    zoomInBtn.onclick = async () => changeZoom(0.5);
+    zoomInBtn.onclick  = async () => changeZoom(0.5);
     zoomOutBtn.onclick = async () => changeZoom(-0.5);
 
     setZoom = (newZoom) => {
