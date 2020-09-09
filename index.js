@@ -10,6 +10,8 @@ const autoTable = (depth) => new Proxy([], {
 const bytesPerPixel = 4;
 
 const maxIterations = 1000;
+const modLimit = 1000;
+const sampleCount = 2;
 const zoomSpeed = 100;
 const tileEdge = 320;
 
@@ -33,9 +35,9 @@ const coordinateToPixel = (width, height, zoom, re, im, posRe, posIm) => {
 const getColor = (re, im) => {
     let zRe = 0, zIm = 0, zReSquared = 0, zImSquared = 0; // Z0 is 0
 
-    // The point is considered to belong to the Mandelbrot set if the
-    // absolute value of Z_n is less than or equal to 2 for all n >= 0.
-    for (var i = 0; i < maxIterations && (zReSquared + zImSquared) <= 4; ++i) {
+    // The point is considered to belong to the Mandelbrot set if the absolute
+    // value of Z_n is less than or equal to R (modLimit) for all n >= 0, R >= 2.
+    for (var i = 0; i < maxIterations && (zReSquared + zImSquared) < modLimit * modLimit; ++i) {
         //  Z_n+1  = Z_n ^ 2 + c
         // Z_n ^ 2 = (zRe + zIm * i) * (zRe + zIm * i)
         //         = (zRe ^ 2 - zIm ^ 2) + (2 * zRe * zIm) * i
@@ -49,17 +51,18 @@ const getColor = (re, im) => {
 }
 
 const makeTile = async (width, height, nZoom, re, im, posRe, posIm) => {
-    const pixelArray = new Uint8ClampedArray(tileEdge * tileEdge * bytesPerPixel);
+    const sTileEdge = tileEdge * sampleCount;
+    const pixelArray = new Uint8ClampedArray(sTileEdge * sTileEdge * bytesPerPixel);
 
     const [baseX, baseY] = coordinateToPixel(
-        width, height, nZoom, re, im, posRe, posIm
+        width, height, nZoom * sampleCount, re, im, posRe, posIm
     ).map(Math.round);
 
-    for (let posY = 0; posY < tileEdge; ++posY) {
-        for (let posX = 0; posX < tileEdge; ++posX) {
-            const indexBase = (posY * tileEdge + posX) * bytesPerPixel;
+    for (let posY = 0; posY < sTileEdge; ++posY) {
+        for (let posX = 0; posX < sTileEdge; ++posX) {
+            const indexBase = (posY * sTileEdge + posX) * bytesPerPixel;
             const [re, im] = pixelToCoordinate(
-                width, height, nZoom, baseX + posX, baseY + posY, posRe, posIm
+                width, height, nZoom * sampleCount, baseX + posX, baseY + posY, posRe, posIm
             );
             const [red, green, blue] = getColor(re, im);
 
@@ -70,8 +73,8 @@ const makeTile = async (width, height, nZoom, re, im, posRe, posIm) => {
         }
     }
 
-    const imageData = new ImageData(pixelArray, tileEdge, tileEdge);
-    return createImageBitmap(imageData, 0, 0, tileEdge, tileEdge);
+    const imageData = new ImageData(pixelArray, sTileEdge, sTileEdge);
+    return createImageBitmap(imageData, 0, 0, sTileEdge, sTileEdge);
 };
 
 const updateCanvas = (() => {
@@ -100,13 +103,12 @@ const updateCanvas = (() => {
 
         canvas.width = width, canvas.height = height;
         const drawContext = canvas.getContext("2d");
+        const [baseX, baseY] = coordinateToPixel(
+            width, height, zoom, lowRe, highIm, posRe, posIm
+        ).map(Math.floor);
 
-        for (let im = highIm; im > lowIm; im -= (1 / nZoom)) {
-            for (let re = lowRe; re < highRe; re += (1 / nZoom)) {
-                const [destX, destY] = coordinateToPixel(
-                    width, height, zoom, re, im, posRe, posIm
-                ).map(Math.round);
-
+        for (let im = highIm, destY = baseY; im > lowIm; im -= (1 / nZoom), destY += sEdge) {
+            for (let re = lowRe, destX = baseX; re < highRe; re += (1 / nZoom), destX += sEdge) {
                 drawContext.drawImage(
                     tiles[sIndex][im][re], destX, destY, sEdge, sEdge
                 );
@@ -156,8 +158,7 @@ const updateEventHandlers = (width, height, zoom, posRe, posIm, tiles) => {
     }
 
     const changeZoom = async (zoomDiff) => {
-        const newZoom = zoom * (1 + zoomDiff);
-        if (newZoom < 1) return;
+        const newZoom = Math.max(zoom * (1 + zoomDiff), 1);
         await updateCanvas(width, height, newZoom, posRe, posIm, tiles);
     }
 
