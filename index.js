@@ -46,8 +46,12 @@ const getColor = (re, im) => {
         zReSquared = zRe * zRe, zImSquared = zIm * zIm;
     }
 
+    const potentialVal = Math.log(Math.log(zReSquared + zImSquared) / Math.pow(2, i));
+
     return i == maxIterations ? [0, 0, 0]
-                : [(i + 10) % 256, (i + 25) % 256, (i + 50) % 256];
+                : [Math.round(Math.cos(potentialVal + 0.5 * Math.PI) * 127) + 128,
+                   Math.round(Math.cos(potentialVal + 1.0 * Math.PI) * 127) + 128,
+                   Math.round(Math.cos(potentialVal + 1.5 * Math.PI) * 127) + 128];
 }
 
 const makeTile = async (width, height, nZoom, re, im, posRe, posIm) => {
