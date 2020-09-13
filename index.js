@@ -1,6 +1,7 @@
 const canvas = document.getElementById("canvas");
 const docElement = document.documentElement;
 
+const renderingPopupBg = document.getElementById("renderingPopupBg");
 const zoomInBtn = document.getElementById("zoomIn");
 const zoomOutBtn = document.getElementById("zoomOut");
 
@@ -47,11 +48,9 @@ const getColor = (re, im) => {
     }
 
     const potentialVal = Math.log(Math.log(zReSquared + zImSquared) / Math.pow(2, i));
+    const colorFn = (mult) => Math.round(Math.cos(potentialVal + mult * Math.PI) * 127) + 128;
 
-    return i == maxIterations ? [0, 0, 0]
-                : [Math.round(Math.cos(potentialVal + 0.5 * Math.PI) * 127) + 128,
-                   Math.round(Math.cos(potentialVal + 1.0 * Math.PI) * 127) + 128,
-                   Math.round(Math.cos(potentialVal + 1.5 * Math.PI) * 127) + 128];
+    return i == maxIterations ? [0, 0, 0] : [ colorFn(0.5), colorFn(1.0), colorFn(1.5) ];
 }
 
 const makeTile = async (width, height, nZoom, re, im, posRe, posIm) => {
@@ -82,12 +81,14 @@ const makeTile = async (width, height, nZoom, re, im, posRe, posIm) => {
 };
 
 const updateCanvas = (() => {
+    // This lock ensures that the canvas is only modified by one event handler at a time.
     let locked = false;
 
     return async (width, height, zoom, posRe, posIm, tiles) => {
         if (locked) return;
         locked = true;
 
+        // sIndex is used to select the correct tile set for the current zoom level
         const sIndex = Math.round(Math.log2(zoom)), nZoom = Math.pow(2, sIndex);
         const sFactor = zoom / nZoom, sEdge = Math.ceil(tileEdge * sFactor);
 
@@ -98,6 +99,7 @@ const updateCanvas = (() => {
         for (let im = highIm; im > lowIm; im -= (1 / nZoom)) {
             for (let re = lowRe; re < highRe; re += (1 / nZoom)) {
                 if (!tiles[sIndex][im][re]) {
+                    renderingPopupBg.style.display = "flex";
                     tiles[sIndex][im][re] = await makeTile(
                         width, height, nZoom, re, im, posRe, posIm
                     );
@@ -120,6 +122,7 @@ const updateCanvas = (() => {
         }
 
         updateEventHandlers(width, height, zoom, posRe, posIm, tiles);
+        renderingPopupBg.style.display = "none";
         locked = false;
     }
 })();
