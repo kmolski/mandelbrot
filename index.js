@@ -2,8 +2,10 @@ const canvas = document.getElementById("canvas");
 const docElement = document.documentElement;
 
 const renderingPopupBg = document.getElementById("renderingPopupBg");
+const settingsPopup = document.getElementById("settingsPopup");
 const zoomInBtn = document.getElementById("zoomIn");
 const zoomOutBtn = document.getElementById("zoomOut");
+const openSettingsBtn = document.getElementById("openSettings");
 
 const autoTable = (depth) => new Proxy([], {
     get: (arr, i) => i in arr ? arr[i] : (depth ? arr[i] = autoTable(depth - 1) : undefined)
@@ -16,6 +18,7 @@ const sampleCount = 2;
 const zoomSpeed = 100;
 const tileEdge = 320;
 
+const initWidth = docElement.clientWidth, initHeight = docElement.clientHeight;
 const minRe = -2, maxRe = 0.5; // Set projection bounds in the real axis
 const initRe = (minRe + maxRe) / 2, initIm = 0;
 
@@ -115,9 +118,7 @@ const updateCanvas = (() => {
 
         for (let im = highIm, destY = baseY; im > lowIm; im -= (1 / nZoom), destY += sEdge) {
             for (let re = lowRe, destX = baseX; re < highRe; re += (1 / nZoom), destX += sEdge) {
-                drawContext.drawImage(
-                    tiles[sIndex][im][re], destX, destY, sEdge, sEdge
-                );
+                drawContext.drawImage(tiles[sIndex][im][re], destX, destY, sEdge, sEdge);
             }
         }
 
@@ -169,13 +170,14 @@ const updateEventHandlers = (width, height, zoom, posRe, posIm, tiles) => {
         await updateCanvas(width, height, newZoom, posRe, posIm, tiles);
     }
 
-    zoomInBtn.onclick  = async () => changeZoom(0.5);
+    zoomInBtn.onclick  = async () => changeZoom(+0.5);
     zoomOutBtn.onclick = async () => changeZoom(-0.5);
+    openSettingsBtn.onclick = () => settingsPopup.style.display =
+        (settingsPopup.style.display === "flex") ? "none" : "flex";
 
     setZoom = (newZoom) => {
         updateCanvas(width, height, newZoom, posRe, posIm, tiles);
     }
 }
 
-const initWidth = docElement.clientWidth, initHeight = docElement.clientHeight;
 updateCanvas(initWidth, initHeight, 1, initRe, initIm, autoTable(2));

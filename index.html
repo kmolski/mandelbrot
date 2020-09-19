@@ -15,6 +15,7 @@
 
     #openSettings,
     #renderingPopupMsg,
+    #settingsPopup,
     .zoomButton {
         color: lightgray;
         background-color: #404040;
@@ -29,16 +30,17 @@
         position: fixed;
         right: 0px;
         top: 0px;
-        padding: 2px 8px 4px;
+        padding: 2px 8px;
         border-width: 0px 0px 1px 1px;
         border-bottom-left-radius: 4px;
         box-shadow: 0px 0px 4px black;
     }
 
     #renderingPopupMsg {
-        padding: 20px 40px;
+        padding: 20px 32px;
         border-width: 1px;
         border-radius: 4px;
+        box-shadow: 0px 0px 20px black;
     }
 
     #renderingPopupBg {
@@ -53,6 +55,19 @@
         backdrop-filter: blur(4px);
     }
 
+    #settingsPopup {
+        display: none;
+        position: fixed;
+        flex-direction: column;
+        right: 48px;
+        top: 10px;
+        padding: 20px 32px;
+        border-radius: 4px;
+        border-width: 1px;
+        box-shadow: 0px 0px 12px black;
+        font-size: 16px;
+    }
+
     .zoomButton {
         margin-bottom: 8px;
         border-width: 1px;
@@ -60,7 +75,7 @@
         box-shadow: 1px 1px 4px black;
     }
 
-    .zoomButtonContainer {
+    #zoomButtonContainer {
         display: grid;
         position: fixed;
         right: 10px;
@@ -77,7 +92,29 @@
 
     <button id="openSettings">⚙</button>
 
-    <div class="zoomButtonContainer">
+    <div id="settingsPopup">
+        <div>
+            <div class="settingsSectionTitle">Zoom and position:</div>
+            <div>
+                Re: <input id="reInputField"> <br>
+                Im: <input id="imInputField"> <br>
+                Zoom: <input id="zoomInputField"> <br>
+                <button>Apply</button>
+            </div>
+        </div>
+        <div>
+            <div class="settingsSectionTitle">Rendering settings:</div>
+            <div>
+                Iteration count: <input id="iterCountInputField" type="number"> <br>
+                Modulo limit: <input id="modLimitInputField" type="number"> <br>
+                Sample count: <input id="sampleCountInputField" type="number"> <br>
+                Zoom speed: <input id="zoomSpeedInputField" type="number"> <br>
+                <button>Apply</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="zoomButtonContainer">
         <button class="zoomButton" id="zoomIn">+</button>
         <button class="zoomButton" id="zoomOut">-</button>
     </div>
