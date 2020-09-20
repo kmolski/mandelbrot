@@ -3,24 +3,40 @@ const docElement = document.documentElement;
 
 const renderingPopupBg = document.getElementById("renderingPopupBg");
 const settingsPopup = document.getElementById("settingsPopup");
+
+const openSettingsBtn = document.getElementById("openSettings");
 const zoomInBtn = document.getElementById("zoomIn");
 const zoomOutBtn = document.getElementById("zoomOut");
-const openSettingsBtn = document.getElementById("openSettings");
+
+const reInputField = document.getElementById("reInput");
+const imInputField = document.getElementById("imInput");
+const zoomInputField = document.getElementById("zoomInput");
+const zoomAndPositionApplyBtn = document.getElementById("zoomAndPositionApply");
+
+const maxIterInputField = document.getElementById("maxIterInput");
+const modLimitInputField = document.getElementById("modLimitInput");
+const sampleCountInputField = document.getElementById("sampleCountInput");
+const zoomSpeedInputField = document.getElementById("zoomSpeedInput");
+const renderSettingsApplyBtn = document.getElementById("renderSettingsApply");
 
 const autoTable = (depth) => new Proxy([], {
     get: (arr, i) => i in arr ? arr[i] : (depth ? arr[i] = autoTable(depth - 1) : undefined)
 });
-const bytesPerPixel = 4;
 
-const maxIterations = 1000;
-const modLimit = 1000;
-const sampleCount = 2;
-const zoomSpeed = 100;
+const bytesPerPixel = 4;
 const tileEdge = 320;
 
 const initWidth = docElement.clientWidth, initHeight = docElement.clientHeight;
-const minRe = -2, maxRe = 0.5; // Set projection bounds in the real axis
+
+const minRe = -2.0, maxRe = 0.5; // Set projection bounds in the real axis
 const initRe = (minRe + maxRe) / 2, initIm = 0;
+
+const initSettings = {
+    maxIterations: 1000, modLimit: 1000, sampleCount: 2, zoomSpeed: 100
+};
+
+openSettingsBtn.onclick = () => settingsPopup.style.display =
+    (settingsPopup.style.display === "flex") ? "none" : "flex";
 
 const pixelToCoordinate = (width, height, zoom, posX, posY, posRe, posIm) => {
     // Convert pixel coordinates to coordinates on the complex plane,
@@ -36,7 +52,7 @@ const coordinateToPixel = (width, height, zoom, re, im, posRe, posIm) => {
              (posIm - im) * zoom * tileEdge + height / 2 ];
 }
 
-const getColor = (re, im) => {
+const getColor = (re, im, {maxIterations, modLimit}) => {
     let zRe = 0, zIm = 0, zReSquared = 0, zImSquared = 0; // Z0 is 0
 
     // The point is considered to belong to the Mandelbrot set if the absolute
@@ -56,7 +72,8 @@ const getColor = (re, im) => {
     return i == maxIterations ? [0, 0, 0] : [ colorFn(0.5), colorFn(1.0), colorFn(1.5) ];
 }
 
-const makeTile = async (width, height, nZoom, re, im, posRe, posIm) => {
+const makeTile = async (width, height, nZoom, re, im, posRe, posIm, settings) => {
+    const {sampleCount} = settings;
     const sTileEdge = tileEdge * sampleCount;
     const pixelArray = new Uint8ClampedArray(sTileEdge * sTileEdge * bytesPerPixel);
 
@@ -70,7 +87,7 @@ const makeTile = async (width, height, nZoom, re, im, posRe, posIm) => {
             const [re, im] = pixelToCoordinate(
                 width, height, nZoom * sampleCount, baseX + posX, baseY + posY, posRe, posIm
             );
-            const [red, green, blue] = getColor(re, im);
+            const [red, green, blue] = getColor(re, im, settings);
 
             pixelArray[indexBase + 0] = red;
             pixelArray[indexBase + 1] = green;
@@ -87,7 +104,7 @@ const updateCanvas = (() => {
     // This lock ensures that the canvas is only modified by one event handler at a time.
     let locked = false;
 
-    return async (width, height, zoom, posRe, posIm, tiles) => {
+    return async (width, height, zoom, posRe, posIm, tiles, settings) => {
         if (locked) return;
         locked = true;
 
@@ -104,7 +121,7 @@ const updateCanvas = (() => {
                 if (!tiles[sIndex][im][re]) {
                     renderingPopupBg.style.display = "flex";
                     tiles[sIndex][im][re] = await makeTile(
-                        width, height, nZoom, re, im, posRe, posIm
+                        width, height, nZoom, re, im, posRe, posIm, settings
                     );
                 }
             }
@@ -122,16 +139,19 @@ const updateCanvas = (() => {
             }
         }
 
-        updateEventHandlers(width, height, zoom, posRe, posIm, tiles);
         renderingPopupBg.style.display = "none";
+        updateEventHandlers(width, height, zoom, posRe, posIm, tiles, settings);
+        updateSettingsPopup(width, height, zoom, posRe, posIm, tiles, settings);
         locked = false;
     }
 })();
 
-const updateEventHandlers = (width, height, zoom, posRe, posIm, tiles) => {
+const updateEventHandlers = (width, height, zoom, posRe, posIm, tiles, settings) => {
+    const {zoomSpeed} = settings;
+
     window.onresize = async () => {
         const newWidth = docElement.clientWidth, newHeight = docElement.clientHeight;
-        await updateCanvas(newWidth, newHeight, zoom, posRe, posIm, tiles);
+        await updateCanvas(newWidth, newHeight, zoom, posRe, posIm, tiles, settings);
     }
 
     canvas.onmousedown = (event) => {
@@ -140,14 +160,13 @@ const updateEventHandlers = (width, height, zoom, posRe, posIm, tiles) => {
         canvas.onmousemove = async (event) => {
             const newRe = posRe + (initX - event.clientX) / zoom / tileEdge;
             const newIm = posIm - (initY - event.clientY) / zoom / tileEdge;
-            await updateCanvas(width, height, zoom, newRe, newIm, tiles);
+            await updateCanvas(width, height, zoom, newRe, newIm, tiles, settings);
         }
 
         canvas.onmouseup = () => {
             canvas.onmousemove = null;
         }
     }
-
 
     canvas.onwheel = async (event) => {
         if (event.deltaY) {
@@ -159,7 +178,7 @@ const updateEventHandlers = (width, height, zoom, posRe, posIm, tiles) => {
             const [newRe, newIm] = [ posRe + (event.clientX - width / 2)  / offsetDivisor,
                                      posIm + (height / 2 - event.clientY) / offsetDivisor ];
 
-            await updateCanvas(width, height, newZoom, newRe, newIm, tiles);
+            await updateCanvas(width, height, newZoom, newRe, newIm, tiles, settings);
             // Update canvas.onmousemove() so that dragging after zooming works correctly.
             if (canvas.onmousemove) { canvas.onmousedown(event); }
         }
@@ -167,17 +186,36 @@ const updateEventHandlers = (width, height, zoom, posRe, posIm, tiles) => {
 
     const changeZoom = async (zoomDiff) => {
         const newZoom = Math.max(zoom * (1 + zoomDiff), 1);
-        await updateCanvas(width, height, newZoom, posRe, posIm, tiles);
+        await updateCanvas(width, height, newZoom, posRe, posIm, tiles, settings);
     }
 
     zoomInBtn.onclick  = async () => changeZoom(+0.5);
     zoomOutBtn.onclick = async () => changeZoom(-0.5);
-    openSettingsBtn.onclick = () => settingsPopup.style.display =
-        (settingsPopup.style.display === "flex") ? "none" : "flex";
+}
 
-    setZoom = (newZoom) => {
-        updateCanvas(width, height, newZoom, posRe, posIm, tiles);
+const updateSettingsPopup = (width, height, zoom, posRe, posIm, tiles, settings) => {
+    reInputField.value = posRe, imInputField.value = posIm, zoomInputField.value = zoom;
+    maxIterInputField.value = settings.maxIterations;
+    modLimitInputField.value = settings.modLimit;
+    sampleCountInputField.value = settings.sampleCount;
+    zoomSpeedInputField.value = settings.zoomSpeed;
+
+    zoomAndPositionApplyBtn.onclick = async () => {
+        const newZoom = Number(zoomInputField.value);
+        const newRe = Number(reInputField.value), newIm = Number(imInputField.value);
+        await updateCanvas(width, height, newZoom, newRe, newIm, tiles, settings);
+    }
+
+    renderSettingsApplyBtn.onclick = async () => {
+        const newSettings = {
+            maxIterations: Number(maxIterInputField.value),
+            modLimit:      Number(modLimitInputField.value),
+            sampleCount:   Number(sampleCountInputField.value),
+            zoomSpeed:     Number(zoomSpeedInputField.value)
+        };
+        // Changing the rendering settings invalidates all previously rendered tiles.
+        await updateCanvas(width, height, zoom, posRe, posIm, autoTable(2), newSettings);
     }
 }
 
-updateCanvas(initWidth, initHeight, 1, initRe, initIm, autoTable(2));
+updateCanvas(initWidth, initHeight, 1, initRe, initIm, autoTable(2), initSettings);
