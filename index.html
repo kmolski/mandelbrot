@@ -16,7 +16,8 @@
     #openSettings,
     #renderingPopupMsg,
     #settingsPopup,
-    .zoomButton {
+    .zoomButton,
+    .settingsSection>button {
         color: lightgray;
         background-color: #404040;
         font-family: Arial, Helvetica, sans-serif;
@@ -24,6 +25,8 @@
         text-align: center;
         border-color: lightgray;
         border-style: solid;
+        border-width: 1px;
+        border-radius: 4px;
     }
 
     #openSettings {
@@ -32,14 +35,12 @@
         top: 0px;
         padding: 2px 8px;
         border-width: 0px 0px 1px 1px;
-        border-bottom-left-radius: 4px;
+        border-radius: 0px 0px 0px 4px;
         box-shadow: 0px 0px 4px black;
     }
 
     #renderingPopupMsg {
         padding: 20px 32px;
-        border-width: 1px;
-        border-radius: 4px;
         box-shadow: 0px 0px 20px black;
     }
 
@@ -61,17 +62,39 @@
         flex-direction: column;
         right: 48px;
         top: 10px;
-        padding: 20px 32px;
-        border-radius: 4px;
-        border-width: 1px;
         box-shadow: 0px 0px 12px black;
         font-size: 16px;
     }
 
+    .settingsSection {
+        display: flex;
+        flex-direction: column;
+        padding: 8px 12px;
+    }
+
+    .settingsSection>* {
+        padding: 2px 12px;
+    }
+
+    .settingsSection>div {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .settingsSection>div>* {
+        margin: 0px 12px;
+    }
+
+    .settingsSection>button {
+        background-color: #5c5c5c;
+        font-size: 16px;
+        padding: 6px 16px;
+        margin: 4px auto;
+    }
+
     .zoomButton {
         margin-bottom: 8px;
-        border-width: 1px;
-        border-radius: 4px;
         box-shadow: 1px 1px 4px black;
     }
 
@@ -93,25 +116,21 @@
     <button id="openSettings">⚙</button>
 
     <div id="settingsPopup">
-        <div>
-            <div class="settingsSectionTitle">Zoom and position:</div>
-            <div>
-                Re: <input id="reInput"> <br>
-                Im: <input id="imInput"> <br>
-                Zoom: <input id="zoomInput"> <br>
-                <button id="zoomAndPositionApply">Apply</button>
-            </div>
-        </div>
-        <div>
-            <div class="settingsSectionTitle">Rendering settings:</div>
-            <div>
-                Iteration count: <input id="maxIterInput" type="number"> <br>
-                Modulo limit: <input id="modLimitInput" type="number"> <br>
-                Sample count: <input id="sampleCountInput" type="number"> <br>
-                Zoom speed: <input id="zoomSpeedInput" type="number"> <br>
-                <button id="renderSettingsApply">Apply</button>
-            </div>
-        </div>
+        <form class="settingsSection" id="zoomAndPosition" action="javascript:void(0);">
+            <h>Zoom and position:</h>
+            <div>Re: <input id="reInput" type="number" step="any"> </div>
+            <div>Im: <input id="imInput" type="number" step="any"> </div>
+            <div>Zoom: <input id="zoomInput" type="number" step="any" min="1"> </div>
+            <button type="submit">Apply</button>
+        </form>
+        <form class="settingsSection" id="renderSettings" action="javascript:void(0);">
+            <h>Rendering settings:</h>
+            <div>Iteration count: <input id="maxIterInput" type="number" min="1"> </div>
+            <div>Modulo limit: <input id="modLimitInput" type="number" min="2"> </div>
+            <div>Sample count: <input id="sampleCountInput" type="number" min="1"> </div>
+            <div>Zoom speed: <input id="zoomSpeedInput" type="number" min="1"> </div>
+            <button type="submit">Apply</button>
+        </form>
     </div>
 
     <div id="zoomButtonContainer">

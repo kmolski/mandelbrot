@@ -4,20 +4,18 @@ const docElement = document.documentElement;
 const renderingPopupBg = document.getElementById("renderingPopupBg");
 const settingsPopup = document.getElementById("settingsPopup");
 
-const openSettingsBtn = document.getElementById("openSettings");
-const zoomInBtn = document.getElementById("zoomIn");
-const zoomOutBtn = document.getElementById("zoomOut");
-
 const reInputField = document.getElementById("reInput");
 const imInputField = document.getElementById("imInput");
 const zoomInputField = document.getElementById("zoomInput");
-const zoomAndPositionApplyBtn = document.getElementById("zoomAndPositionApply");
+const zoomAndPositionForm = document.getElementById("zoomAndPosition");
 
-const maxIterInputField = document.getElementById("maxIterInput");
-const modLimitInputField = document.getElementById("modLimitInput");
-const sampleCountInputField = document.getElementById("sampleCountInput");
-const zoomSpeedInputField = document.getElementById("zoomSpeedInput");
-const renderSettingsApplyBtn = document.getElementById("renderSettingsApply");
+const renderSettingsFields = {
+    maxIterations: document.getElementById("maxIterInput"),
+    modLimit: document.getElementById("modLimitInput"),
+    sampleCount: document.getElementById("sampleCountInput"),
+    zoomSpeed: document.getElementById("zoomSpeedInput"),
+};
+const renderSettingsForm = document.getElementById("renderSettings");
 
 const autoTable = (depth) => new Proxy([], {
     get: (arr, i) => i in arr ? arr[i] : (depth ? arr[i] = autoTable(depth - 1) : undefined)
@@ -34,9 +32,6 @@ const initRe = (minRe + maxRe) / 2, initIm = 0;
 const initSettings = {
     maxIterations: 1000, modLimit: 1000, sampleCount: 2, zoomSpeed: 100
 };
-
-openSettingsBtn.onclick = () => settingsPopup.style.display =
-    (settingsPopup.style.display === "flex") ? "none" : "flex";
 
 const pixelToCoordinate = (width, height, zoom, posX, posY, posRe, posIm) => {
     // Convert pixel coordinates to coordinates on the complex plane,
@@ -57,7 +52,7 @@ const getColor = (re, im, {maxIterations, modLimit}) => {
 
     // The point is considered to belong to the Mandelbrot set if the absolute
     // value of Z_n is less than or equal to R (modLimit) for all n >= 0, R >= 2.
-    for (var i = 0; i < maxIterations && (zReSquared + zImSquared) < modLimit * modLimit; ++i) {
+    for (var i = 0; i < maxIterations && (zReSquared + zImSquared) < modLimit ** 2; ++i) {
         //  Z_n+1  = Z_n ^ 2 + c
         // Z_n ^ 2 = (zRe + zIm * i) * (zRe + zIm * i)
         //         = (zRe ^ 2 - zIm ^ 2) + (2 * zRe * zIm) * i
@@ -66,7 +61,7 @@ const getColor = (re, im, {maxIterations, modLimit}) => {
         zReSquared = zRe * zRe, zImSquared = zIm * zIm;
     }
 
-    const potentialVal = Math.log(Math.log(zReSquared + zImSquared) / Math.pow(2, i));
+    const potentialVal = Math.log(Math.log(zReSquared + zImSquared) / (2 ** i));
     const colorFn = (mult) => Math.round(Math.cos(potentialVal + mult * Math.PI) * 127) + 128;
 
     return i == maxIterations ? [0, 0, 0] : [ colorFn(0.5), colorFn(1.0), colorFn(1.5) ];
@@ -109,7 +104,7 @@ const updateCanvas = (() => {
         locked = true;
 
         // sIndex is used to select the correct tile set for the current zoom level
-        const sIndex = Math.round(Math.log2(zoom)), nZoom = Math.pow(2, sIndex);
+        const sIndex = Math.round(Math.log2(zoom)), nZoom = 2 ** sIndex;
         const sFactor = zoom / nZoom, sEdge = Math.ceil(tileEdge * sFactor);
 
         let [lowRe, highIm] = pixelToCoordinate(width, height, zoom, 0, 0, posRe, posIm);
@@ -189,33 +184,31 @@ const updateEventHandlers = (width, height, zoom, posRe, posIm, tiles, settings)
         await updateCanvas(width, height, newZoom, posRe, posIm, tiles, settings);
     }
 
-    zoomInBtn.onclick  = async () => changeZoom(+0.5);
-    zoomOutBtn.onclick = async () => changeZoom(-0.5);
+    document.getElementById("zoomIn").onclick  = async () => changeZoom(+0.5);
+    document.getElementById("zoomOut").onclick = async () => changeZoom(-0.5);
 }
 
 const updateSettingsPopup = (width, height, zoom, posRe, posIm, tiles, settings) => {
     reInputField.value = posRe, imInputField.value = posIm, zoomInputField.value = zoom;
-    maxIterInputField.value = settings.maxIterations;
-    modLimitInputField.value = settings.modLimit;
-    sampleCountInputField.value = settings.sampleCount;
-    zoomSpeedInputField.value = settings.zoomSpeed;
+    Object.entries(settings).forEach(([k, v]) => { renderSettingsFields[k].value = v; });
 
-    zoomAndPositionApplyBtn.onclick = async () => {
+    zoomAndPositionForm.onsubmit = async () => {
         const newZoom = Number(zoomInputField.value);
         const newRe = Number(reInputField.value), newIm = Number(imInputField.value);
         await updateCanvas(width, height, newZoom, newRe, newIm, tiles, settings);
     }
 
-    renderSettingsApplyBtn.onclick = async () => {
-        const newSettings = {
-            maxIterations: Number(maxIterInputField.value),
-            modLimit:      Number(modLimitInputField.value),
-            sampleCount:   Number(sampleCountInputField.value),
-            zoomSpeed:     Number(zoomSpeedInputField.value)
-        };
-        // Changing the rendering settings invalidates all previously rendered tiles.
+    renderSettingsForm.onsubmit = async () => {
+        const newSettings = Object.fromEntries(
+            Object.entries(renderSettingsFields).map(([k, f]) => [k, Number(f.value)])
+        );
+        // Changing the rendering settings invalidates all previously rendered
+        // tiles, so the tile array needs to be replaced by a new one.
         await updateCanvas(width, height, zoom, posRe, posIm, autoTable(2), newSettings);
     }
 }
+
+document.getElementById("openSettings").onclick = () =>
+    settingsPopup.style.display = (settingsPopup.style.display === "flex") ? "none" : "flex";
 
 updateCanvas(initWidth, initHeight, 1, initRe, initIm, autoTable(2), initSettings);
