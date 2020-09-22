@@ -54,16 +54,20 @@
         justify-content: center;
         align-items: center;
         backdrop-filter: blur(4px);
+        transition: opacity 0.2s;
     }
 
     #settingsPopup {
-        display: none;
+        display: flex;
         position: fixed;
         flex-direction: column;
+        visibility: hidden;
+        opacity: 0;
         right: 48px;
         top: 10px;
         box-shadow: 0px 0px 12px black;
         font-size: 16px;
+        transition: opacity 0.2s;
     }
 
     .settingsSection {

@@ -114,7 +114,8 @@ const updateCanvas = (() => {
         for (let im = highIm; im > lowIm; im -= (1 / nZoom)) {
             for (let re = lowRe; re < highRe; re += (1 / nZoom)) {
                 if (!tiles[sIndex][im][re]) {
-                    renderingPopupBg.style.display = "flex";
+                    renderingPopupBg.style.visibility = "visible";
+                    renderingPopupBg.style.opacity = 1;
                     tiles[sIndex][im][re] = await makeTile(
                         width, height, nZoom, re, im, posRe, posIm, settings
                     );
@@ -134,7 +135,9 @@ const updateCanvas = (() => {
             }
         }
 
-        renderingPopupBg.style.display = "none";
+        renderingPopupBg.style.opacity = 0;
+        setTimeout(() => { renderingPopupBg.style.visibility = "hidden"; }, 200);
+
         updateEventHandlers(width, height, zoom, posRe, posIm, tiles, settings);
         updateSettingsPopup(width, height, zoom, posRe, posIm, tiles, settings);
         locked = false;
@@ -208,7 +211,14 @@ const updateSettingsPopup = (width, height, zoom, posRe, posIm, tiles, settings)
     }
 }
 
-document.getElementById("openSettings").onclick = () =>
-    settingsPopup.style.display = (settingsPopup.style.display === "flex") ? "none" : "flex";
+document.getElementById("openSettings").onclick = () => {
+    if (settingsPopup.style.visibility === "visible") {
+        settingsPopup.style.opacity = 0;
+        setTimeout(() => { settingsPopup.style.visibility = "hidden"; }, 200);
+    } else {
+        settingsPopup.style.visibility = "visible";
+        settingsPopup.style.opacity = 1;
+    }
+}
 
 updateCanvas(initWidth, initHeight, 1, initRe, initIm, autoTable(2), initSettings);
