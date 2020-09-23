@@ -11,9 +11,9 @@ const zoomAndPositionForm = document.getElementById("zoomAndPosition");
 
 const renderSettingsFields = {
     maxIterations: document.getElementById("maxIterInput"),
-    modLimit: document.getElementById("modLimitInput"),
-    sampleCount: document.getElementById("sampleCountInput"),
-    zoomSpeed: document.getElementById("zoomSpeedInput"),
+    modLimit:      document.getElementById("modLimitInput"),
+    sampleCount:   document.getElementById("sampleCountInput"),
+    zoomSpeed:     document.getElementById("zoomSpeedInput"),
 };
 const renderSettingsForm = document.getElementById("renderSettings");
 
@@ -23,9 +23,6 @@ const autoTable = (depth) => new Proxy([], {
 
 const bytesPerPixel = 4;
 const tileEdge = 320;
-
-const initWidth = docElement.clientWidth, initHeight = docElement.clientHeight;
-
 const minRe = -2.0, maxRe = 0.5; // Set projection bounds in the real axis
 const initRe = (minRe + maxRe) / 2, initIm = 0;
 
@@ -99,13 +96,14 @@ const updateCanvas = (() => {
     // This lock ensures that the canvas is only modified by one event handler at a time.
     let locked = false;
 
-    return async (width, height, zoom, posRe, posIm, tiles, settings) => {
+    return async (zoom, posRe, posIm, tiles, settings) => {
         if (locked) return;
         locked = true;
 
         // sIndex is used to select the correct tile set for the current zoom level
         const sIndex = Math.round(Math.log2(zoom)), nZoom = 2 ** sIndex;
         const sFactor = zoom / nZoom, sEdge = Math.ceil(tileEdge * sFactor);
+        const width = docElement.clientWidth, height = docElement.clientHeight;
 
         let [lowRe, highIm] = pixelToCoordinate(width, height, zoom, 0, 0, posRe, posIm);
         let [highRe, lowIm] = pixelToCoordinate(width, height, zoom, width, height, posRe, posIm);
@@ -148,8 +146,7 @@ const updateEventHandlers = (width, height, zoom, posRe, posIm, tiles, settings)
     const {zoomSpeed} = settings;
 
     window.onresize = async () => {
-        const newWidth = docElement.clientWidth, newHeight = docElement.clientHeight;
-        await updateCanvas(newWidth, newHeight, zoom, posRe, posIm, tiles, settings);
+        await updateCanvas(zoom, posRe, posIm, tiles, settings);
     }
 
     canvas.onmousedown = (event) => {
@@ -158,7 +155,7 @@ const updateEventHandlers = (width, height, zoom, posRe, posIm, tiles, settings)
         canvas.onmousemove = async (event) => {
             const newRe = posRe + (initX - event.clientX) / zoom / tileEdge;
             const newIm = posIm - (initY - event.clientY) / zoom / tileEdge;
-            await updateCanvas(width, height, zoom, newRe, newIm, tiles, settings);
+            await updateCanvas(zoom, newRe, newIm, tiles, settings);
         }
 
         canvas.onmouseup = () => {
@@ -176,7 +173,7 @@ const updateEventHandlers = (width, height, zoom, posRe, posIm, tiles, settings)
             const [newRe, newIm] = [ posRe + (event.clientX - width / 2)  / offsetDivisor,
                                      posIm + (height / 2 - event.clientY) / offsetDivisor ];
 
-            await updateCanvas(width, height, newZoom, newRe, newIm, tiles, settings);
+            await updateCanvas(newZoom, newRe, newIm, tiles, settings);
             // Update canvas.onmousemove() so that dragging after zooming works correctly.
             if (canvas.onmousemove) { canvas.onmousedown(event); }
         }
@@ -184,7 +181,7 @@ const updateEventHandlers = (width, height, zoom, posRe, posIm, tiles, settings)
 
     const changeZoom = async (zoomDiff) => {
         const newZoom = Math.max(zoom * (1 + zoomDiff), 1);
-        await updateCanvas(width, height, newZoom, posRe, posIm, tiles, settings);
+        await updateCanvas(newZoom, posRe, posIm, tiles, settings);
     }
 
     document.getElementById("zoomIn").onclick  = async () => changeZoom(+0.5);
@@ -198,7 +195,7 @@ const updateSettingsPopup = (width, height, zoom, posRe, posIm, tiles, settings)
     zoomAndPositionForm.onsubmit = async () => {
         const newZoom = Number(zoomInputField.value);
         const newRe = Number(reInputField.value), newIm = Number(imInputField.value);
-        await updateCanvas(width, height, newZoom, newRe, newIm, tiles, settings);
+        await updateCanvas(newZoom, newRe, newIm, tiles, settings);
     }
 
     renderSettingsForm.onsubmit = async () => {
@@ -207,7 +204,7 @@ const updateSettingsPopup = (width, height, zoom, posRe, posIm, tiles, settings)
         );
         // Changing the rendering settings invalidates all previously rendered
         // tiles, so the tile array needs to be replaced by a new one.
-        await updateCanvas(width, height, zoom, posRe, posIm, autoTable(2), newSettings);
+        await updateCanvas(zoom, posRe, posIm, autoTable(2), newSettings);
     }
 }
 
@@ -221,4 +218,4 @@ document.getElementById("openSettings").onclick = () => {
     }
 }
 
-updateCanvas(initWidth, initHeight, 1, initRe, initIm, autoTable(2), initSettings);
+updateCanvas(1, initRe, initIm, autoTable(2), initSettings);
