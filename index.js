@@ -49,7 +49,7 @@ const getColor = (re, im, {maxIterations, modLimit}) => {
 
     // The point is considered to belong to the Mandelbrot set if the absolute
     // value of Z_n is less than or equal to R (modLimit) for all n >= 0, R >= 2.
-    for (var i = 0; i < maxIterations && (zReSquared + zImSquared) < modLimit ** 2; ++i) {
+    for (var i = 0; i < maxIterations && (zReSquared + zImSquared) <= modLimit ** 2; ++i) {
         //  Z_n+1  = Z_n ^ 2 + c
         // Z_n ^ 2 = (zRe + zIm * i) * (zRe + zIm * i)
         //         = (zRe ^ 2 - zIm ^ 2) + (2 * zRe * zIm) * i
@@ -64,22 +64,17 @@ const getColor = (re, im, {maxIterations, modLimit}) => {
     return i == maxIterations ? [0, 0, 0] : [ colorFn(0.5), colorFn(1.0), colorFn(1.5) ];
 }
 
-const makeTile = async (width, height, nZoom, re, im, posRe, posIm, settings) => {
+const makeTile = async (nZoom, re, im, settings) => {
     const {sampleCount} = settings;
     const sTileEdge = tileEdge * sampleCount;
     const pixelArray = new Uint8ClampedArray(sTileEdge * sTileEdge * bytesPerPixel);
 
-    const [baseX, baseY] = coordinateToPixel(
-        width, height, nZoom * sampleCount, re, im, posRe, posIm
-    ).map(Math.round);
-
     for (let posY = 0; posY < sTileEdge; ++posY) {
         for (let posX = 0; posX < sTileEdge; ++posX) {
             const indexBase = (posY * sTileEdge + posX) * bytesPerPixel;
-            const [re, im] = pixelToCoordinate(
-                width, height, nZoom * sampleCount, baseX + posX, baseY + posY, posRe, posIm
+            const [red, green, blue] = getColor(
+                re + posX / nZoom / sTileEdge, im - posY / nZoom / sTileEdge, settings
             );
-            const [red, green, blue] = getColor(re, im, settings);
 
             pixelArray[indexBase + 0] = red;
             pixelArray[indexBase + 1] = green;
@@ -114,9 +109,7 @@ const updateCanvas = (() => {
                 if (!tiles[sIndex][im][re]) {
                     renderingPopupBg.style.visibility = "visible";
                     renderingPopupBg.style.opacity = 1;
-                    tiles[sIndex][im][re] = await makeTile(
-                        width, height, nZoom, re, im, posRe, posIm, settings
-                    );
+                    tiles[sIndex][im][re] = await makeTile(nZoom, re, im, settings);
                 }
             }
         }
@@ -125,7 +118,7 @@ const updateCanvas = (() => {
         const drawContext = canvas.getContext("2d");
         const [baseX, baseY] = coordinateToPixel(
             width, height, zoom, lowRe, highIm, posRe, posIm
-        ).map(Math.floor);
+        ).map(Math.round);
 
         for (let im = highIm, destY = baseY; im > lowIm; im -= (1 / nZoom), destY += sEdge) {
             for (let re = lowRe, destX = baseX; re < highRe; re += (1 / nZoom), destX += sEdge) {
